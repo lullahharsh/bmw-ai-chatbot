@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Comparison Assistant</title>
+    <link rel="stylesheet" href="ai-buttons.css">
+</head>
+<body>
+<nav>
+    <a href="#home">Home</a>
+    <a href="#compare-cars">Compare cars</a>
+    <a href="#ai-assistant">AI Assistant</a>
+    <a href="#">About</a>
+</nav>
+
+    <section class="hero" id="home">
+    <h1>Find Your Perfect Drive</h1>
+    <p>Compare cars, explore specifications, and
+       get AI-powered recommendations.</p>
+    <div class="hero-buttons">
+        <a href="#" class="btn-primary">Compare cars</a>
+    <a href="#ai-assistant" class="btn-secondary">Ask AI</a>
+    </div>
+</section>
+
+<div class="car-selection" id="compare-cars">
+
+    <div class="car-box">
+        <h3>Vehicle 1</h3>
+<label for="year1">Year</label>
+<select id="year1">
+    <option value="">Select year</option>
+</select>
+
+<label>Make</label>
+<select id="make1">
+    <option value="">Select make</option>
+    <option value="bmw">BMW</option>
+    <option value="audi">Audi</option>
+    <option value="mercedes-benz">Mercedes-Benz</option>
+</select>
+
+<select id="car1">
+    <option value="">Select a car</option>
+</select>
+
+<label for="trim1">Trim</label>
+<select id="trim1">
+    <option value="">Select trim</option>
+</select>
+    </div>
+
+   <div class="car-box">
+    <h3>Vehicle 2</h3>
+
+    <label for="year2">Year</label>
+    <select id="year2">
+        <option value="">Select year</option>
+    </select>
+
+       <label for="make2">Make</label>
+<select id="make2">
+    <option value="">Select make</option>
+    <option value="bmw">BMW</option>
+    <option value="audi">Audi</option>
+    <option value="mercedes-benz">Mercedes-Benz</option>
+</select>
+
+    <select id="car2">
+        <option value="">Select a car</option>
+        <option value="bmw-m340i">BMW M340i</option>
+        <option value="audi-s4">Audi S4</option>
+        <option value="mercedes-c43">Mercedes C43 AMG</option>
+    </select>
+
+    <label for="trim2">Trim</label>
+<select id="trim2">
+    <option value="">Select trim</option>
+</select>
+</div>
+
+<button class="compare-btn">
+    Compare Cars
+</button>
+<div id="comparison-results"></div>
+
+</div>
+<section id="ai-assistant">
+    <h2>AI Car Assistant</h2>
+    <p>Do you have any other questions?</p>
+
+    <div class="chat-container">
+    <div class="chat-header">
+    <span>AI Car Assistant</span>
+    <button id="new-chat-btn">+ New Chat</button>
+</div>
+
+    <div id="chat-messages" class="chat-messages">
+        <div class="ai-message">
+            Hi! I'm your AI Car Assistant. Ask me anything about cars.
+        </div>
+    </div>
+
+    <div class="chat-input-area">
+        <input
+            type="text"
+            id="ai-question"
+            placeholder="Ask anything about cars..."
+        >
+
+        <button id="ask-ai-btn">Send</button>
+        <button id="stop-ai-btn" style="display: none;">Stop Generating</button>
+    </div>
+
+</div>
+</section>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.6/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="App.js"></script>
+</body>
+</html>
