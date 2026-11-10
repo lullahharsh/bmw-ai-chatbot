@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Car Comparison Assistant</title>
     <link rel="stylesheet" href="ai-buttons.css">
+    <script
+  type="module"
+  src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.1.0/model-viewer.min.js">
+</script>
 </head>
 <body>
 <nav>
@@ -24,10 +28,26 @@
     </div>
 </section>
 
-<div class="car-selection" id="compare-cars">
+<section id="car-3d-viewer">
+    <h2>Explore Cars in 3D</h2>
+    <p>Rotate, zoom, and explore your favorite cars.</p>
 
+    <div class="viewer-container">
+        
+<div id="car-3d-display">
+    <model-viewer
+        id="selected-car-3d"
+        camera-controls
+        auto-rotate>
+    </model-viewer>
+</div>
+    </div>
+</section>
+
+<div class="car-selection" id="compare-cars">
     <div class="car-box">
         <h3>Vehicle 1</h3>
+    <img id="car-image1" alt="Vehicle 1 photo" style="display: none;">
 <label for="year1">Year</label>
 <select id="year1">
     <option value="">Select year</option>
@@ -53,7 +73,7 @@
 
    <div class="car-box">
     <h3>Vehicle 2</h3>
-
+    <img id="car-image2" alt="Vehicle 2 photo" style="display: none;">
     <label for="year2">Year</label>
     <select id="year2">
         <option value="">Select year</option>
@@ -117,6 +137,11 @@
 </section>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.2.6/purify.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script
+    src="https://carimagesapi.com/assets/js/carimages.js"
+    data-api-key=ci_93c03265512402ab1ae2e51fa1095360d7fb9901665f47351f89d87e
+    async>
+</script>
     <script src="App.js"></script>
 </body>
 </html>

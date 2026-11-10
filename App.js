@@ -71,6 +71,9 @@ function getVehicleData(xml) {
 
     return {
         name: `${get("year")} ${get("make")} ${get("model")}`,
+        year: get("year"),
+        make: get("make"),
+        model: get("model"),
         engine: `${displacement}L ${cylinders} Cylinder`,
         drivetrain: get("drive"),
         transmission: get("trany"),
@@ -85,10 +88,11 @@ function createCarCard(car) {
     return `
         <div class="result-card">
             <h3>${car.name}</h3>
-            <div class="spec-row">
-                <span>Engine</span>
-                <strong>${car.engine}</strong>
-            </div>
+        <img class="comparison-car-image" src="http://127.0.0.1:5001/car-image?make=${encodeURIComponent(car.make)}&model=${encodeURIComponent(car.model)}&year=${encodeURIComponent(car.year)}" alt="${car.name}" loading="eager" decoding="async" onerror="this.style.visibility='hidden'">
+<div class="spec-row">
+    <span>Engine</span>
+    <strong>${car.engine}</strong>
+</div>
             <div class="spec-row">
                 <span>Drivetrain</span>
                 <strong>${car.drivetrain}</strong>
@@ -284,124 +288,145 @@ for (let i = 1; i <= 2; i++) {
 
 const askAIButton = document.getElementById("ask-ai-btn");
 const stopAIButton = document.getElementById("stop-ai-btn");
-let stopGenerating = false;
-let aiController = null;
-stopAIButton.addEventListener("click", function () {
-    stopGenerating = true;
-
-    if (aiController) {
-        aiController.abort();
-        aiController = null;
-    }
-
-    askAIButton.disabled = false;
-    stopAIButton.style.display = "none";
-});
 const chatMessages = document.getElementById("chat-messages");
 const aiInput = document.getElementById("ai-question");
+const newChatButton = document.getElementById("new-chat-btn");
+
+let aiController = null;
+let activeRequest = 0;
+let stopGenerating = false;
+
+stopAIButton.addEventListener("click", function () {
+    stopGenerating = true;
+    if (aiController) aiController.abort();
+    stopAIButton.style.display = "none";
+});
 
 askAIButton.addEventListener("click", async function () {
     const question = aiInput.value.trim();
-    stopGenerating = false;
+    if (!question || askAIButton.disabled) return;
 
-    if (!question) return;
+    const requestId = ++activeRequest;
+    stopGenerating = false;
+    const controller = new AbortController();
+    aiController = controller;
+    askAIButton.disabled = true;
+    stopAIButton.style.display = "inline-block";
 
     const userMessage = document.createElement("div");
     userMessage.className = "user-message";
     userMessage.textContent = question;
     chatMessages.appendChild(userMessage);
-
     aiInput.value = "";
 
     const aiMessage = document.createElement("div");
     aiMessage.className = "ai-message";
     aiMessage.textContent = "Thinking...";
     chatMessages.appendChild(aiMessage);
-
     chatMessages.scrollTop = chatMessages.scrollHeight;
-    askAIButton.disabled = true;
-    stopAIButton.style.display = "inline-block";
 
     try {
-        const controller = new AbortController();
-        aiController = controller;
-        const response = await fetch("http://127.0.0.1:5001/chat", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ message: question }),
-            signal: controller.signal
-        });
-
-        if (!response.ok) {
-            throw new Error("AI request failed");
+        let isImageRequest = /\b(?:generate|create|draw|make|show)\b.{0,100}\b(?:image|picture|photo)\b|\b(?:image|picture|photo)\s+of\b/i.test(question);
+        try {
+            const intentResponse = await fetch("http://127.0.0.1:5001/detect-intent", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: question }),
+                signal: controller.signal
+            });
+            if (intentResponse.ok) {
+                const intentData = await intentResponse.json();
+                isImageRequest = intentData.intent === "image" || intentData.intent === "both";
+            }
+        } catch (error) {
+            if (error.name === "AbortError") throw error;
         }
 
+        const imagePrompt = question.replace(/^(?:(?:now|please)\s+)?(?:(?:generate|create|draw|make|show)\s+)?(?:me\s+)?(?:an?\s+)?(?:image|picture|photo)\s+(?:of\s+)?/i, "").trim() || question;
+        const response = await fetch(isImageRequest
+            ? "http://127.0.0.1:5001/generate-image"
+            : "http://127.0.0.1:5001/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(isImageRequest ? { prompt: imagePrompt } : { message: question }),
+            signal: controller.signal
+        });
+        if (!response.ok) throw new Error(`Server returned ${response.status}`);
         const data = await response.json();
-        const reply = data.reply || data.error || "No response.";
+        if (requestId !== activeRequest || stopGenerating) return;
 
-const words = reply.split(/(\s+)/);
-let currentText = "";
-aiMessage.textContent = "";
-
-for (const word of words) {
-
-    if (stopGenerating) break;
-    currentText += word;
-
-    if (typeof marked !== "undefined" && typeof DOMPurify !== "undefined") {
-        aiMessage.innerHTML = DOMPurify.sanitize(marked.parse(currentText));
-    } else {
-        aiMessage.textContent = currentText;
+        if (isImageRequest) {
+            if (!data.image) throw new Error(data.error || "Image not returned");
+            aiMessage.textContent = "";
+            if (data.reply) {
+                const description = document.createElement("p");
+                description.textContent = data.reply;
+                aiMessage.appendChild(description);
+            }
+            const img = document.createElement("img");
+            img.src = data.image;
+            img.alt = imagePrompt;
+            img.style.maxWidth = "450px";
+            img.style.width = "100%";
+            img.style.borderRadius = "12px";
+            img.onerror = function () { aiMessage.textContent = "Image could not be loaded."; };
+            aiMessage.appendChild(img);
+        } else {
+            if (data.error) throw new Error(data.error);
+            const reply = String(data.reply || "No response.");
+            let currentText = "";
+            aiMessage.textContent = "";
+            for (const word of reply.split(/(\s+)/)) {
+                if (stopGenerating || requestId !== activeRequest) break;
+                currentText += word;
+                if (typeof marked !== "undefined" && typeof DOMPurify !== "undefined") {
+                    aiMessage.innerHTML = DOMPurify.sanitize(marked.parse(currentText));
+                } else {
+                    aiMessage.textContent = currentText;
+                }
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                await new Promise(resolve => setTimeout(resolve, 35));
+            }
+            if (stopGenerating && requestId === activeRequest) {
+                aiMessage.textContent = currentText + "\nGeneration stopped.";
+            }
+        }
+    } catch (error) {
+        if (requestId === activeRequest) {
+            aiMessage.textContent = error.name === "AbortError" ? "Generation stopped." : "Unable to complete request. Check your Python server.";
+            if (error.name !== "AbortError") console.error("AI request error:", error);
+        }
+    } finally {
+        if (requestId === activeRequest) {
+            aiController = null;
+            askAIButton.disabled = false;
+            stopAIButton.style.display = "none";
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
     }
-
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    await new Promise(resolve => setTimeout(resolve, 35));
-}
-
-   } catch (error) {
-    if (error.name === "AbortError") {
-        aiMessage.textContent = "Generation stopped.";
-    } else {
-        aiMessage.textContent = "Unable to connect to AI.";
-        console.error(error);
-    }
-} finally {
-    askAIButton.disabled = false;
-    stopAIButton.style.display = "none";
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-}
 });
 
 aiInput.addEventListener("keydown", function (event) {
-    if (event.key === "Enter" && !askAIButton.disabled) {
+    if (event.key === "Enter" && !event.shiftKey && !askAIButton.disabled) {
+        event.preventDefault();
         askAIButton.click();
     }
 });
 
-const newChatButton = document.getElementById("new-chat-btn");
-
 newChatButton.addEventListener("click", async function () {
+    ++activeRequest;
+    stopGenerating = true;
+    if (aiController) aiController.abort();
+    aiController = null;
+    askAIButton.disabled = false;
+    stopAIButton.style.display = "none";
     try {
-        const response = await fetch("http://127.0.0.1:5001/new-chat", {
-            method: "POST"
-        });
-
-        if (!response.ok) {
-            throw new Error("Failed to reset conversation");
-        }
-
-        chatMessages.innerHTML = `
-            <div class="ai-message">
-                Hi! I'm your AI Car Assistant. Ask me anything about cars.
-            </div>
-        `;
-
+        const response = await fetch("http://127.0.0.1:5001/new-chat", { method: "POST" });
+        if (!response.ok) throw new Error("Failed to reset chat");
+        chatMessages.innerHTML = `<div class="ai-message">Hi! I'm your AI Car Assistant. Ask me anything about cars.</div>`;
         aiInput.value = "";
-
     } catch (error) {
-        console.error("New Chat error:", error);
+        console.error("New chat error:", error);
         alert("Unable to start a new chat.");
     }
 });
@@ -440,3 +465,115 @@ const paragraphShade = Math.round(107 + darkness * 148);
 heroTitle.style.color = `rgb(${textShade}, ${textShade}, ${textShade})`;
 heroText.style.color = `rgb(${paragraphShade}, ${paragraphShade}, ${paragraphShade})`;
 });
+
+
+async function update3DCar() {
+    const year = document.getElementById("year1").value;
+    const makeSelect = document.getElementById("make1");
+    const modelSelect = document.getElementById("car1");
+const trimSelect = document.getElementById("trim1");
+
+const trim = trimSelect?.selectedOptions[0]?.textContent.trim() || "";
+    const make = makeSelect.selectedOptions[0]?.textContent.trim();
+    const model = modelSelect.selectedOptions[0]?.textContent.trim();
+
+    const container = document.getElementById("car-3d-display");
+
+    if (!container) return;
+
+    const requestId = ++update3DCar.requestId;
+
+    container.replaceChildren();
+
+    if (!year || !makeSelect.value || !modelSelect.value) {
+        return;
+    }
+
+    container.textContent = "Searching for 3D car...";
+
+    try {
+        const params = new URLSearchParams({
+            year: year,
+            make: make,
+            model: model,
+            trim: trim
+        });
+
+        const response = await fetch(
+            `http://127.0.0.1:5001/search-3d-car?${params}`
+        );
+
+        if (!response.ok) {
+            throw new Error("3D search failed");
+        }
+
+        const data = await response.json();
+
+        if (requestId !== update3DCar.requestId) {
+            return;
+        }
+
+        if (!data.models || data.models.length === 0) {
+            container.textContent = "No 3D model found for this car.";
+            return;
+        }
+
+        const selectedModel = data.models.find(
+            item => item.uid
+        );
+
+        if (!selectedModel) {
+            container.textContent = "No usable 3D model found.";
+            return;
+        }
+
+        const iframe = document.createElement("iframe");
+
+        iframe.src =
+            `https://sketchfab.com/models/${encodeURIComponent(selectedModel.uid)}/embed`;
+
+        iframe.style.width = "100%";
+        iframe.style.height = "450px";
+        iframe.style.border = "none";
+        iframe.style.borderRadius = "12px";
+
+        iframe.allow = "autoplay; fullscreen; xr-spatial-tracking";
+        iframe.allowFullscreen = true;
+
+        iframe.title = `${selectedModel.name} 3D model`;
+
+        container.replaceChildren(iframe);
+
+    } catch (error) {
+        if (requestId !== update3DCar.requestId) return;
+
+        console.error("3D car error:", error);
+        container.textContent = "Unable to load 3D car.";
+    }
+}
+
+update3DCar.requestId = 0;
+
+document.getElementById("year1").addEventListener(
+    "change",
+    update3DCar
+);
+
+document.getElementById("make1").addEventListener(
+    "change",
+    update3DCar
+);
+
+document.getElementById("car1").addEventListener(
+    "change",
+    update3DCar
+);
+
+document.getElementById("year1").addEventListener("change", update3DCar);
+document.getElementById("make1").addEventListener("change", update3DCar);
+document.getElementById("car1").addEventListener("change", update3DCar);
+
+document.getElementById("trim1").addEventListener(
+    "change",
+    update3DCar
+);

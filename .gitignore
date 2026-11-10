@@ -2,3 +2,4 @@
 .env
 __pychache__/
 .DS_Store
+image_cache/
